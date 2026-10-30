@@ -6,7 +6,8 @@ Run it with:  python -m talentquery.seed
 Everything here is made up. Names come from short lists, emails use the
 reserved example.com domain, and phone numbers use the fictional 555-01xx range.
 Dates are spread over the last 18 months, relative to today, so questions like
-"applications in the last 30 days" always have data.
+"applications in the last 30 days" always have data. Because of that, row counts
+change a little from day to day, but two runs on the same day match exactly.
 """
 import argparse
 import random
@@ -41,6 +42,16 @@ CITIES = [
     ("Atlanta", "GA"), ("Miami", "FL"), ("New York", "NY"), ("Boston", "MA"),
 ]
 
+# Field hierarchy for retail stores: store -> district -> area -> region.
+REGION_BY_STATE = {
+    "WA": "Pacific Northwest", "OR": "Pacific Northwest", "CA": "California",
+    "AZ": "Southwest", "CO": "Southwest", "TX": "South Central", "IL": "Midwest",
+    "GA": "Southeast", "FL": "Southeast", "NY": "Northeast", "MA": "Northeast",
+}
+
+# Pay ranges are higher in these states.
+HIGH_COST_STATES = {"CA", "NY", "MA", "WA"}
+
 COMPANIES = [
     "Acme Retail", "Blue Harbor Foods", "Cedar Logistics", "Delta Grocers", "Evergreen Tech",
     "Fern Systems", "Granite Bank", "Harbor Health", "Ironwood Labs", "Juniper Hotels",
@@ -52,44 +63,67 @@ MAJORS = [
     "Supply Chain Management", "Communications", "Accounting", "Information Systems",
 ]
 
-# department -> list of (title, seniority_level, usual employment_type)
+# department -> list of (job_code, title, seniority_level, usual employment_type)
+# The job code identifies the kind of job. Every requisition for that job shares it.
 DEPARTMENTS = {
     "Retail Operations": [
-        ("Barista", "entry", "part_time"),
-        ("Shift Supervisor", "mid", "part_time"),
-        ("Assistant Store Manager", "senior", "full_time"),
-        ("Store Manager", "manager", "full_time"),
-        ("District Manager", "director", "full_time"),
+        ("RET-101", "Barista", "entry", "part_time"),
+        ("RET-102", "Shift Supervisor", "mid", "part_time"),
+        ("RET-103", "Assistant Store Manager", "senior", "full_time"),
+        ("RET-104", "Store Manager", "manager", "full_time"),
+        ("RET-105", "District Manager", "director", "full_time"),
     ],
     "Supply Chain": [
-        ("Warehouse Associate", "entry", "full_time"),
-        ("Logistics Coordinator", "mid", "full_time"),
-        ("Supply Chain Analyst", "mid", "full_time"),
-        ("Distribution Center Manager", "manager", "full_time"),
+        ("SCM-201", "Warehouse Associate", "entry", "full_time"),
+        ("SCM-202", "Logistics Coordinator", "mid", "full_time"),
+        ("SCM-203", "Supply Chain Analyst", "mid", "full_time"),
+        ("SCM-204", "Distribution Center Manager", "manager", "full_time"),
     ],
     "Technology": [
-        ("Software Engineer", "mid", "full_time"),
-        ("Senior Software Engineer", "senior", "full_time"),
-        ("Data Engineer", "mid", "full_time"),
-        ("DevOps Engineer", "senior", "full_time"),
-        ("Engineering Intern", "entry", "internship"),
+        ("TEC-301", "Software Engineer", "mid", "full_time"),
+        ("TEC-302", "Senior Software Engineer", "senior", "full_time"),
+        ("TEC-303", "Data Engineer", "mid", "full_time"),
+        ("TEC-304", "DevOps Engineer", "senior", "full_time"),
+        ("TEC-305", "Engineering Intern", "entry", "internship"),
     ],
     "Finance": [
-        ("Financial Analyst", "mid", "full_time"),
-        ("Payroll Specialist", "mid", "contract"),
-        ("Finance Manager", "manager", "full_time"),
+        ("FIN-401", "Financial Analyst", "mid", "full_time"),
+        ("FIN-402", "Payroll Specialist", "mid", "contract"),
+        ("FIN-403", "Finance Manager", "manager", "full_time"),
     ],
     "Human Resources": [
-        ("Recruiter", "mid", "full_time"),
-        ("HR Coordinator", "entry", "full_time"),
-        ("HR Business Partner", "senior", "full_time"),
+        ("HRS-501", "Recruiter", "mid", "full_time"),
+        ("HRS-502", "HR Coordinator", "entry", "full_time"),
+        ("HRS-503", "HR Business Partner", "senior", "full_time"),
     ],
     "Marketing": [
-        ("Marketing Specialist", "mid", "full_time"),
-        ("Social Media Coordinator", "entry", "contract"),
-        ("Brand Manager", "manager", "full_time"),
+        ("MKT-601", "Marketing Specialist", "mid", "full_time"),
+        ("MKT-602", "Social Media Coordinator", "entry", "contract"),
+        ("MKT-603", "Brand Manager", "manager", "full_time"),
     ],
 }
+
+# job_code -> (low end of range, high end of range, pay frequency), before any location adjustment
+PAY_RANGES = {
+    "RET-101": (15.00, 19.50, "hourly"), "RET-102": (18.00, 23.50, "hourly"),
+    "RET-103": (52000, 70000, "annual"), "RET-104": (65000, 92000, "annual"),
+    "RET-105": (95000, 130000, "annual"),
+    "SCM-201": (17.50, 22.00, "hourly"), "SCM-202": (55000, 72000, "annual"),
+    "SCM-203": (68000, 92000, "annual"), "SCM-204": (105000, 140000, "annual"),
+    "TEC-301": (110000, 150000, "annual"), "TEC-302": (140000, 190000, "annual"),
+    "TEC-303": (115000, 155000, "annual"), "TEC-304": (135000, 180000, "annual"),
+    "TEC-305": (28.00, 38.00, "hourly"),
+    "FIN-401": (70000, 95000, "annual"), "FIN-402": (27.00, 36.00, "hourly"),
+    "FIN-403": (115000, 150000, "annual"),
+    "HRS-501": (65000, 90000, "annual"), "HRS-502": (48000, 62000, "annual"),
+    "HRS-503": (100000, 135000, "annual"),
+    "MKT-601": (62000, 85000, "annual"), "MKT-602": (24.00, 32.00, "hourly"),
+    "MKT-603": (105000, 140000, "annual"),
+}
+
+# Within a department, some jobs are opened far more often than others.
+# Jobs not listed here get weight 1.
+JOB_WEIGHTS = {"RET-101": 12, "RET-102": 6, "RET-103": 3, "RET-104": 2, "RET-105": 1}
 
 # Retail hires the most, so it gets the most positions.
 DEPARTMENT_WEIGHTS = {
@@ -116,7 +150,8 @@ WRITEBACK_ERRORS = {
     "DUPLICATE_RECORD": "Duplicate record found for {email}",  # contains PII on purpose
 }
 
-NOW = datetime.now().replace(microsecond=0)
+# Anchor to midnight so running the seed twice on the same day gives identical data.
+NOW = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 HISTORY_START = NOW - timedelta(days=540)
 
 
@@ -180,7 +215,7 @@ def make_profiles(count):
             "last_name": last,
             "email": person_email(first, last, profile_id),
             "phone": fake_phone() if random.random() < 0.9 else None,
-            "title": random.choice(DEPARTMENTS[random.choice(list(DEPARTMENTS))])[0],
+            "title": random.choice(DEPARTMENTS[random.choice(list(DEPARTMENTS))])[1],
             "current_company": random.choice(COMPANIES),
             "location_city": city,
             "location_state": state,
@@ -204,33 +239,90 @@ def make_profiles(count):
     return profiles
 
 
-def make_positions(count):
+def make_stores():
+    """3-6 stores per city. Each city's stores fall into one or two districts."""
+    stores = []
+    areas = {}  # state -> area name, numbered in the order states appear
+    for city_index, (city, state) in enumerate(CITIES):
+        areas.setdefault(state, f"Area {len(areas) + 1}")
+        store_count = random.randint(3, 6)
+        for n in range(1, store_count + 1):
+            # Bigger cities are split into two districts.
+            district_offset = n % 2 if store_count >= 4 else 0
+            stores.append({
+                "store_number": str(10001 + len(stores)),
+                "store_name": f"{city} #{n}",
+                "location_city": city,
+                "location_state": state,
+                "district": f"District {101 + city_index * 2 + district_offset}",
+                "area": areas[state],
+                "region": REGION_BY_STATE[state],
+                "open_date": (NOW - timedelta(days=random.randint(365 * 2, 365 * 15))).strftime("%Y-%m-%d"),
+            })
+    return stores
+
+
+def pay_range(job_code, state):
+    low, high, frequency = PAY_RANGES[job_code]
+    factor = 1.15 if state in HIGH_COST_STATES else 1.0
+    low, high = low * factor, high * factor
+    if frequency == "hourly":
+        low, high = round(low * 4) / 4, round(high * 4) / 4  # nearest quarter
+    else:
+        low, high = round(low, -3), round(high, -3)  # nearest thousand
+    return low, (low + high) / 2, high, frequency
+
+
+def make_positions(count, stores):
     positions = []
     departments = list(DEPARTMENT_WEIGHTS)
     weights = list(DEPARTMENT_WEIGHTS.values())
     for position_id in range(1, count + 1):
         department = random.choices(departments, weights)[0]
-        title, seniority, employment_type = random.choice(DEPARTMENTS[department])
-        city, state = random.choice(CITIES)
-        created = random_time_between(HISTORY_START, NOW - timedelta(days=5))
+        jobs = DEPARTMENTS[department]
+        job_weights = [JOB_WEIGHTS.get(job[0], 1) for job in jobs]
+        job_code, title, seniority, employment_type = random.choices(jobs, job_weights)[0]
 
+        # Store jobs belong to a store. Corporate jobs (and district managers) don't.
+        store = None
+        if department == "Retail Operations" and title != "District Manager":
+            store = random.choice(stores)
+            city, state = store["location_city"], store["location_state"]
+        else:
+            city, state = random.choice(CITIES)
+
+        created = random_time_between(HISTORY_START, NOW - timedelta(days=5))
         closed = None
         if random.random() < 0.55:
             closed = days_later(created, 30, 200)
             if closed > NOW:
                 closed = None
-        is_open = 1 if closed is None and random.random() < 0.9 else 0  # some are on hold
+
+        # Closed positions become 'filled' or 'cancelled' later, once we know
+        # whether anyone was hired (see finalize_positions).
+        if closed:
+            status = "filled"
+        else:
+            status = "on_hold" if random.random() < 0.1 else "open"
+
+        min_pay, mid_pay, max_pay, pay_frequency = pay_range(job_code, state)
         positions.append({
             "position_id": position_id,
             "ats_job_id": f"REQ-{20000 + position_id}",
+            "job_code": job_code,
             "title": title,
             "department": department,
             "location_city": city,
             "location_state": state,
             "employment_type": employment_type,
             "seniority_level": seniority,
-            "is_open": is_open,
-            "is_posted": 1 if is_open and random.random() < 0.85 else 0,
+            "store_number": store["store_number"] if store else None,
+            "req_status": status,
+            "is_posted": 1 if status == "open" and random.random() < 0.85 else 0,
+            "min_pay": min_pay,
+            "mid_pay": mid_pay,
+            "max_pay": max_pay,
+            "pay_frequency": pay_frequency,
             "hiring_manager": f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}",
             "recruiter": f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}",
             "created_ts": ts(created),
@@ -238,6 +330,30 @@ def make_positions(count):
             "last_modified_ts": ts(closed or random_time_between(created, NOW)),
         })
     return positions
+
+
+def finalize_positions(positions, applications):
+    """A closed requisition is 'filled' if someone was hired for it, otherwise 'cancelled'.
+
+    A hire can land a little after the requisition stopped taking applicants,
+    so a filled requisition closes on its last hire date if that is later.
+    """
+    last_hire = {}
+    for app in applications:
+        if app["hired_ts"]:
+            position_id = app["position_id"]
+            last_hire[position_id] = max(last_hire.get(position_id, ""), app["hired_ts"])
+
+    for position in positions:
+        if position["closed_ts"] is None:
+            continue
+        hired_at = last_hire.get(position["position_id"])
+        if hired_at:
+            position["req_status"] = "filled"
+            position["closed_ts"] = max(position["closed_ts"], hired_at)
+        else:
+            position["req_status"] = "cancelled"
+        position["last_modified_ts"] = position["closed_ts"]
 
 
 def walk_funnel(application_id, applied_at):
@@ -573,8 +689,10 @@ def seed(db_path=DB_FILE, profile_count=3000, position_count=120, event_count=25
     create_database(db_path)
 
     profiles = make_profiles(profile_count)
-    positions = make_positions(position_count)
+    stores = make_stores()
+    positions = make_positions(position_count, stores)
     applications, history_rows = make_applications(profiles, positions)
+    finalize_positions(positions, applications)
     profiles_by_id = {p["profile_id"]: p for p in profiles}
     positions_by_id = {p["position_id"]: p for p in positions}
     feedback = make_feedback(applications, history_rows)
@@ -586,6 +704,7 @@ def seed(db_path=DB_FILE, profile_count=3000, position_count=120, event_count=25
     conn.execute("PRAGMA foreign_keys = ON")  # SQLite only checks foreign keys when asked
     tables = [
         ("profiles", profiles),
+        ("stores", stores),
         ("positions", positions),
         ("applications", applications),
         ("application_stage_history", history_rows),

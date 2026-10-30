@@ -36,22 +36,42 @@ CREATE TABLE profiles (
     last_modified_ts TEXT NOT NULL
 );
 
--- A job opening. ats_job_id links it back to the ATS requisition.
+-- Retail stores and where they sit in the field hierarchy: store -> district -> area -> region.
+-- Leadership usually asks questions by district or region, not by city.
+CREATE TABLE stores (
+    store_number   TEXT PRIMARY KEY,
+    store_name     TEXT NOT NULL,
+    location_city  TEXT NOT NULL,
+    location_state TEXT NOT NULL,
+    district       TEXT NOT NULL,
+    area           TEXT NOT NULL,
+    region         TEXT NOT NULL,
+    open_date      TEXT NOT NULL
+);
+
+-- A job opening (requisition). ats_job_id links it back to the ATS.
+-- Many positions share one job_code, e.g. every Barista opening in every city.
 CREATE TABLE positions (
     position_id      INTEGER PRIMARY KEY,
-    ats_job_id       TEXT NOT NULL UNIQUE,
+    ats_job_id       TEXT NOT NULL UNIQUE,   -- requisition number: one specific opening
+    job_code         TEXT NOT NULL,          -- type of job; shared by every requisition for that job
     title            TEXT NOT NULL,
     department       TEXT NOT NULL,
     location_city    TEXT NOT NULL,
     location_state   TEXT NOT NULL,
     employment_type  TEXT NOT NULL CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'internship')),
     seniority_level  TEXT NOT NULL CHECK (seniority_level IN ('entry', 'mid', 'senior', 'manager', 'director')),
-    is_open          INTEGER NOT NULL CHECK (is_open IN (0, 1)),
+    store_number     TEXT REFERENCES stores (store_number),  -- NULL for corporate roles
+    req_status       TEXT NOT NULL CHECK (req_status IN ('open', 'on_hold', 'filled', 'cancelled')),
     is_posted        INTEGER NOT NULL CHECK (is_posted IN (0, 1)),  -- visible on the career site
+    min_pay          REAL NOT NULL,
+    mid_pay          REAL NOT NULL,
+    max_pay          REAL NOT NULL,
+    pay_frequency    TEXT NOT NULL CHECK (pay_frequency IN ('hourly', 'annual')),
     hiring_manager   TEXT NOT NULL,
     recruiter        TEXT NOT NULL,
     created_ts       TEXT NOT NULL,
-    closed_ts        TEXT,
+    closed_ts        TEXT,                   -- when it was filled or cancelled
     last_modified_ts TEXT NOT NULL
 );
 
@@ -154,6 +174,8 @@ CREATE TABLE writeback_events (
 
 CREATE INDEX idx_applications_profile ON applications (profile_id);
 CREATE INDEX idx_applications_position ON applications (position_id);
+CREATE INDEX idx_positions_job_code ON positions (job_code);
+CREATE INDEX idx_positions_store ON positions (store_number);
 CREATE INDEX idx_applications_ts ON applications (application_ts);
 CREATE INDEX idx_stage_history_application ON application_stage_history (application_id);
 CREATE INDEX idx_feedback_application ON profile_feedback (application_id);
