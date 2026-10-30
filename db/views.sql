@@ -20,7 +20,7 @@ SELECT profile_id, title, current_company, location_city, location_state, locati
 FROM profiles;
 
 CREATE VIEW vw_positions AS
-SELECT position_id, ats_job_id, job_code, title, department, location_city, location_state,
+SELECT position_id, ats_job_id, job_code, title, department, job_type, location_city, location_state,
        employment_type, seniority_level, store_number, req_status, is_posted,
        min_pay, mid_pay, max_pay, pay_frequency,
        hiring_manager, recruiter, created_ts, closed_ts

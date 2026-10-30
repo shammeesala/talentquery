@@ -57,6 +57,7 @@ CREATE TABLE positions (
     job_code         TEXT NOT NULL,          -- type of job; shared by every requisition for that job
     title            TEXT NOT NULL,
     department       TEXT NOT NULL,
+    job_type         TEXT NOT NULL CHECK (job_type IN ('retail', 'non_retail')),
     location_city    TEXT NOT NULL,
     location_state   TEXT NOT NULL,
     employment_type  TEXT NOT NULL CHECK (employment_type IN ('full_time', 'part_time', 'contract', 'internship')),
@@ -72,7 +73,9 @@ CREATE TABLE positions (
     recruiter        TEXT NOT NULL,
     created_ts       TEXT NOT NULL,
     closed_ts        TEXT,                   -- when it was filled or cancelled
-    last_modified_ts TEXT NOT NULL
+    last_modified_ts TEXT NOT NULL,
+    -- Only retail jobs can belong to a store. (Some retail jobs, like District Manager, have no store.)
+    CHECK (job_type = 'retail' OR store_number IS NULL)
 );
 
 -- A profile applying to a position. One person can have many applications.

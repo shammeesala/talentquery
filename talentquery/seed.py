@@ -312,6 +312,7 @@ def make_positions(count, stores):
             "job_code": job_code,
             "title": title,
             "department": department,
+            "job_type": "retail" if department == "Retail Operations" else "non_retail",
             "location_city": city,
             "location_state": state,
             "employment_type": employment_type,
